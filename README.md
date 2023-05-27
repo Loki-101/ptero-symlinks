@@ -5,12 +5,18 @@ Automatically creates symlinks for Pterodactyl Servers in the user's home direct
 - RHEL Base: `dnf -y install acl`
 - Debian Base: `apt -y install acl`
 
-# As a normal user:
+# Download from Linux Command Line
+```bash
+wget https://github.com/Loki-101/ptero-symlinks/releases/download/latest/symlinks.sh
+chmod +x symlinks.sh
+```
+
+# Usage as a normal user:
 sudo ./symlinks.sh
 
 ![user](https://github.com/Loki-101/ptero-symlinks/assets/59907407/517f0be6-4dc8-43c4-9136-fd44271c1613)
 
-# As root:
+# Usage as root:
 ./symlinks.sh
 
 ![root](https://github.com/Loki-101/ptero-symlinks/assets/59907407/41f18113-4a9e-40bd-be95-0419cd4d9d2f)
