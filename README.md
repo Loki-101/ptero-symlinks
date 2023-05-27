@@ -1,3 +1,6 @@
+# WARNING: THIS SCRIPT ASSUMES /var/www/pterodactyl/.env AND /etc/pterodactyl/config.yml ARE IN THOSE LOCATIONS.
+### This means the script will not function with the docker-compose.yml version of the panel since it doesn't have a .env file in that location, and it also will not function when your panel is on a different machine than your node. It won't break anything; it will just throw an error and exit.
+
 # ptero-symlinks
 Automatically creates symlinks for Pterodactyl Servers in the user's home directory based on the name in the Panel
 
