@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2023 Loki [Loki_101#3580 on Discord or loki@crazycoder.dev]
+# Copyright (c) 2023 Loki [loki_101 on Discord or loki@crazycoder.dev]
 
 # Check if the script is run as root or with sudo
 if [ "$(id -u)" != "0" ]; then
