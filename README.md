@@ -1,8 +1,6 @@
-# WARNING: THIS SCRIPT ASSUMES /var/www/pterodactyl/.env AND /etc/pterodactyl/config.yml ARE IN THOSE LOCATIONS.
-### This means the script will not function with the docker-compose.yml version of the panel since it doesn't have a .env file in that location, and it also will not function when your panel is on a different machine than your node. It won't break anything; it will just throw an error and exit.
-
 # ptero-symlinks
 Automatically creates symlinks for Pterodactyl Servers in the user's home directory based on the name in the Panel
+(Requires panel to be on the same machine as wings, as it gets info from the panel's database and gets the database connection info from your .env file)
 
 # Dependencies: The acl package is required if running this as a normal user:
 - RHEL Base: `dnf -y install acl`
