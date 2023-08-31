@@ -1,3 +1,6 @@
+# Final Result as a screenshot for people who want to visually see what this is before reading a description:
+![image](https://github.com/Loki-101/ptero-symlinks/assets/59907407/83e40b75-147d-4be0-8be2-e5a392efb575)
+
 # ptero-symlinks
 Automatically creates symlinks for Pterodactyl Servers in the user's home directory based on the name in the Panel
 (Requires panel to be on the same machine as wings, as it gets info from the panel's database and gets the database connection info from your .env file)
