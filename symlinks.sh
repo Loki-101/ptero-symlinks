@@ -11,8 +11,42 @@ fi
 if source /var/www/pterodactyl/.env; then
     echo "Loaded .env file successfully."
 else
-    echo "Failed to load .env file. Exiting."
-    exit 1
+    echo "Failed to load .env file."
+    while true; do
+        echo "Would you like to:"
+        echo "1) Manually specify a path to your Pterodactyl Panel's .env file"
+        echo "2) Enter the information to connect to your panel database manually"
+        echo "3) Exit"
+        read -p "Enter your choice (1/2/3): " choice
+
+        case $choice in
+            1)
+                read -p "Enter the path to your .env file: " env_path
+                if source $env_path; then
+                    echo "Loaded .env file from $env_path successfully."
+                    break
+                else
+                    echo "Failed to load .env file from $env_path."
+                fi
+                ;;
+            2)
+                read -p "Enter DB_HOST: " DB_HOST
+                read -p "Enter DB_PORT: " DB_PORT
+                read -p "Enter DB_USERNAME: " DB_USERNAME
+                read -p "Enter DB_PASSWORD: " DB_PASSWORD
+                read -p "Enter DB_DATABASE: " DB_DATABASE
+                echo "Database information entered manually."
+                break
+                ;;
+            3)
+                echo "Exiting."
+                exit 1
+                ;;
+            *)
+                echo "Invalid choice. Please enter 1, 2, or 3."
+                ;;
+        esac
+    done
 fi
 
 # Get "data" path from config.yml file
@@ -64,8 +98,15 @@ for DIR in "${DIRS[@]}"; do
     fi
 done
 
-# Define your MySQL command with connection details
-mysql_cmd="mysql --host=$DB_HOST --port=$DB_PORT --user=$DB_USERNAME --password=$DB_PASSWORD $DB_DATABASE"
+# Connect to database
+if command -v mysql &> /dev/null; then
+  mysql_cmd="mysql --host=$DB_HOST --port=$DB_PORT --user=$DB_USERNAME --password=$DB_PASSWORD $DB_DATABASE"
+elif command -v mariadb &> /dev/null; then
+  mysql_cmd="mariadb --host=$DB_HOST --port=$DB_PORT --user=$DB_USERNAME --password=$DB_PASSWORD $DB_DATABASE"
+else
+  echo "Error: You need mariadb-client or mysql-client installed on your system for this script to function."
+  exit 1
+fi
 
 # Determine the home directory
 if [ "$REAL_USER" = "root" ]; then
@@ -84,7 +125,7 @@ declare -A name_freq
 # Fetch the query results
 results=$($mysql_cmd -N -s -r -e "$query")
 
-# First, count the frequency of each name
+# Count the frequency of each name
 while read -r uuid name; do
     # Check if UUID directory exists and it's not the .sftp directory
     if [ -d "$data_path/$uuid" ] && [ "$uuid" != ".sftp" ]; then
@@ -93,7 +134,7 @@ while read -r uuid name; do
     fi
 done <<< "$results"
 
-# Loop over results from the query again to create symlinks
+# Iterate over results from the query again to create symlinks
 while read -r uuid name; do
     # Check if UUID directory exists and it's not the .sftp directory
     if [ -d "$data_path/$uuid" ] && [ "$uuid" != ".sftp" ]; then
@@ -107,7 +148,7 @@ while read -r uuid name; do
             current_name=$name
         fi
 
-        # Create symlink in the home directory
+        # Create symlink(s) in the home directory
         if [ ! -e "$home_dir/$current_name" ]; then
             if ln -s "$data_path/$uuid" "$home_dir/$current_name"; then
                 echo "Created symlink for $uuid."
