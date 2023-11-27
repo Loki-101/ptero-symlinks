@@ -81,7 +81,7 @@ for DIR in "${DIRS[@]}"; do
             echo "User $REAL_USER does not have read and execute access to $CURRENT_PATH. Would you like to add it? y/n"
             read answer
             if echo "$answer" | grep -iq "^y"; then
-                if sudo setfacl -m u:$REAL_USER:rx $CURRENT_PATH; then
+                if sudo setfacl -Rm u:$REAL_USER:rx $CURRENT_PATH; then
                     echo "Added $REAL_USER to ACL of $CURRENT_PATH."
                     break
                 else
