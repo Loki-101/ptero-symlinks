@@ -1,3 +1,4 @@
+# Currently not working correctly when your panel is in a compose stack. It will set permisisons, but not create the symlinks. Still works fine with a normally installed panel.
 # Final Result as a screenshot for people who want to visually see what this is before reading a description:
 ![image](https://github.com/Loki-101/ptero-symlinks/assets/59907407/83e40b75-147d-4be0-8be2-e5a392efb575)
 
