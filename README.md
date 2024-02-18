@@ -1,12 +1,9 @@
-# Currently not working correctly when your panel is in a compose stack. It will set permisisons, but not create the symlinks. Still works fine with a normally installed panel.
-# Final Result as a screenshot for people who want to visually see what this is before reading a description:
-![image](https://github.com/Loki-101/ptero-symlinks/assets/59907407/83e40b75-147d-4be0-8be2-e5a392efb575)
-
 # ptero-symlinks
 Automatically creates symlinks for Pterodactyl Servers in the user's home directory based on their human readable name
 - Does not require the panel do be on the same machine as wings
 - Should be run from the WINGS machine
 - If panel and wings are on different machines or your .env file in is anywhere other than /var/www/pterodactyl/.env, this script will ask you if you want to specify the path to the .env file or enter the database connection info manually.
+- Compatible with running your panel inside a compose stack - just enter the info manually and make sure your user is allowed to connect from the host machine.
 
 # Dependencies: The acl package is required if running this as a normal user:
 - RHEL Base: `dnf -y install acl`
