@@ -5,9 +5,12 @@ Automatically creates symlinks for Pterodactyl Servers in the user's home direct
 - If panel and wings are on different machines or your .env file in is anywhere other than /var/www/pterodactyl/.env, this script will ask you if you want to specify the path to the .env file or enter the database connection info manually.
 - Compatible with running your panel inside a compose stack - just enter the info manually and make sure your user is allowed to connect from the host machine.
 
-# Dependencies: The acl package is required if running this as a normal user:
+# Dependencies:
+## ACL (Access Control List)
 - RHEL Base: `dnf -y install acl`
 - Debian Base: `apt -y install acl`
+## MariaDB or MySQL Client
+- The package names differ more than acl in various distributions, but it will usually be along the lines of mariadb-client or mysql-client.
 
 # Download from Linux Command Line
 ```bash
