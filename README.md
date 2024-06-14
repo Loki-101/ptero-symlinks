@@ -30,3 +30,5 @@ sudo ./symlinks.sh
 
 # End result:
 In your home folder, so depending on who you ran the script on either in /root or in /home/your-user you will now have folders with human readable names for all your Pterodactyl Panel servers. If you have two servers with the same name a 1 will be appended to the first one, and it will keep increasing. For example, Redbot1 and Redbot2 symlinks will be created if you have two servers named Redbot.
+![image](https://github.com/Loki-101/ptero-symlinks/assets/59907407/79cbf8f7-a948-4bf2-a465-ff0882deccf2)
+
