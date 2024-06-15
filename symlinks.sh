@@ -1,6 +1,9 @@
 #!/bin/bash
 # Copyright (c) 2023 Loki [loki_101 on Discord or loki@crazycoder.dev]
 
+# Define global variables
+PERMISSION_FIX_AGREED=0
+
 # Check if the script is run as root or with sudo
 if [ "$(id -u)" != "0" ]; then
     echo "This script must be run as root or with sudo." 1>&2
@@ -146,6 +149,30 @@ while read -r uuid name; do
             current_name="${name}${name_count[$name]}"
         else
             current_name=$name
+        fi
+
+        # Check if user has rwx permissions through ACL
+        if ! su - $REAL_USER -c "[ -r $data_path/$uuid ] && [ -x $data_path/$uuid ] && [ -w $data_path/$uuid ]"; then
+            if [ $PERMISSION_FIX_AGREED -eq 1 ]; then
+                sudo setfacl -m u:$REAL_USER:rwx $data_path/$uuid
+                echo "Permissions fixed for $data_path/$uuid."
+            else
+                while true; do
+                    echo "User $REAL_USER does not have read, write, and execute access to $data_path/$uuid. Would you like to add it? (y/n)"
+                    read answer </dev/tty
+                    if echo "$answer" | grep -iq "^y$"; then
+                        sudo setfacl -m u:$REAL_USER:rwx $data_path/$uuid
+                        echo "Permissions fixed for $data_path/$uuid."
+                        PERMISSION_FIX_AGREED=1
+                        break
+                    elif echo "$answer" | grep -iq "^n$"; then
+                        echo "No changes made to permissions."
+                        break
+                    else
+                        echo "Invalid input. Please type 'y' or 'n'."
+                    fi
+                done
+            fi
         fi
 
         # Create symlink(s) in the home directory
