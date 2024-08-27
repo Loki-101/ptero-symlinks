@@ -1,5 +1,5 @@
 #!/bin/bash
-# Copyright (c) 2023 Loki [loki_101 on Discord or loki@crazycoder.dev]
+# Copyright (c) 2023-present Loki [loki_101 on Discord or loki@crazycoder.dev]
 
 # Define global variables
 PERMISSION_FIX_AGREED=0
