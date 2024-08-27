@@ -126,6 +126,15 @@ fi
 
 echo "Data path: $data_path"
 
+# Get the node UUID from config.yml
+node_uuid=$(grep 'uuid:' "$config_path" | awk '{print $2}')
+if [ -z "$node_uuid" ]; then
+    echo "Failed to find node UUID in $config_path. Exiting."
+    exit 1
+fi
+
+echo "Node UUID: $node_uuid"
+
 # Get the real user (even when run with sudo)
 REAL_USER=${SUDO_USER:-$(whoami)}
 
@@ -191,8 +200,19 @@ else
     home_dir="/home/$REAL_USER"
 fi
 
-# Query to fetch uuid and name pairs
-query="SELECT uuid, name FROM servers;"
+# Query to fetch node ID and server information
+node_id_query="SELECT id FROM nodes WHERE uuid = '$node_uuid';"
+node_id=$(execute_mysql_query "$node_id_query" | tail -n 1)
+
+if [ -z "$node_id" ]; then
+    echo "Failed to find node ID in the database. Exiting."
+    exit 1
+fi
+
+echo "Node ID: $node_id"
+
+# Query to fetch uuid and name pairs for servers on this node
+query="SELECT uuid, name FROM servers WHERE node_id = $node_id;"
 
 # Declare associative arrays to keep track of names and counts
 declare -A name_count
