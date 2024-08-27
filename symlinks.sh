@@ -90,6 +90,7 @@ else
                 read -p "Enter DB_PORT: " DB_PORT
                 read -p "Enter DB_USERNAME: " DB_USERNAME
                 read -p "Enter DB_DATABASE: " DB_DATABASE
+                read -p "Enter DB_PASSWORD: " DB_PASSWORD
                 echo "Database information entered manually."
                 break
                 ;;
