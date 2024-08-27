@@ -3,7 +3,7 @@ Automatically creates symlinks for Pterodactyl Servers in the user's home direct
 - Does not require the panel do be on the same machine as wings
 - Should be run from the WINGS machine
 - If panel and wings are on different machines or your .env file in is anywhere other than /var/www/pterodactyl/.env, this script will ask you if you want to specify the path to the .env file or enter the database connection info manually.
-- Compatible with running your panel inside a compose stack - just enter the info manually and make sure your user is allowed to connect from the host machine.
+- Compatible with running your panel inside a compose stack - just enter the info manually and make sure your user is allowed to connect from the host machine. (Out of box compatibility is planned for the next large block of free time I get)
 
 # Dependencies:
 ## ACL (Access Control List)
