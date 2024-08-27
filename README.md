@@ -1,9 +1,14 @@
 # ptero-symlinks
 Automatically creates symlinks for Pterodactyl Servers in the user's home directory based on their human readable name
-- Does not require the panel do be on the same machine as wings
-- Should be run from the WINGS machine
-- If panel and wings are on different machines or your .env file in is anywhere other than /var/www/pterodactyl/.env, this script will ask you if you want to specify the path to the .env file or enter the database connection info manually.
-- Compatible with running your panel inside a compose stack - just enter the info manually and make sure your user is allowed to connect from the host machine. (Out of box compatibility is planned for the next large block of free time I get)
+- Should be run from the WINGS machine; if the panel is not hosted on the same machine, you will have to enter the information to connect to your panel's database manually. Once you'd verified it works, you can create a file at /var/www/pterodactyl/.env with the following variables filled out so you don't have to enter it manually each time (The database will have to be open to outside connections from your Wings machine's IP; you can always make a new user for this with read access on the panel database):
+  - ```
+    DB_HOST=
+    DB_PORT=
+    DB_USERNAME=
+    DB_DATABASE=
+    DB_PASSWORD=""
+    ```
+- Compatible with running your panel inside a compose stack if run in the same directory as your panel's docker-compose.yml file or if the compose file is located at /srv/pterodactyl/docker-compose.yml
 
 # Dependencies:
 ## ACL (Access Control List)
