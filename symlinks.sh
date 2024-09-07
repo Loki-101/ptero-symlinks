@@ -41,14 +41,30 @@ extract_db_info_from_compose() {
 # Function to find Wings config path in docker-compose.yml
 find_wings_config_path() {
     local compose_file=$1
-    local wings_path=$(grep -oP '(?<=- ").*(?=:/etc/pterodactyl")' "$compose_file" | head -n 1)
+    local wings_path=$(grep -oP '(?<=- ).*(?=:/etc/pterodactyl)' "$compose_file" | head -n 1)
+    wings_path="${wings_path#\"}"
     
     # If the path contains a variable, expand it
     if [[ $wings_path == \$* ]]; then
         wings_path=$(eval echo $wings_path)
     fi
     
-    echo "$wings_path/config.yml"
+    # Remove any double slashes in the path
+    wings_path=$(echo "$wings_path" | sed 's#//#/#g')
+    
+    # Handle different path endings
+    if [[ $wings_path == */config.yml ]]; then
+        # Path already ends with config.yml, do nothing
+        :
+    elif [[ $wings_path == */ ]]; then
+        # Path ends with /, append config.yml
+        wings_path="${wings_path}config.yml"
+    else
+        # Path doesn't end with / or config.yml, append /config.yml
+        wings_path="${wings_path}/config.yml"
+    fi
+    
+    echo "$wings_path"
 }
 
 # Load database variables
