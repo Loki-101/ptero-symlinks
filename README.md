@@ -19,7 +19,7 @@ Automatically creates symlinks for Pterodactyl Servers in the user's home direct
 
 # Download from Linux Command Line
 ```bash
-wget https://github.com/Loki-101/ptero-symlinks/releases/download/latest/symlinks.sh
+wget https://raw.githubusercontent.com/Loki-101/ptero-symlinks/main/symlinks.sh
 chmod +x symlinks.sh
 ```
 
