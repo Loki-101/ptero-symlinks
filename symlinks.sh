@@ -198,7 +198,7 @@ execute_mysql_query() {
     local query="$1"
     if [ $DOCKER_DETECTED -eq 1 ]; then
         echo "Executing query in Docker environment..."
-        docker compose -f "$COMPOSE_FILE" exec -T database sh -c 'mysql -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" -e "'"$query"'"'
+        docker compose -f "$COMPOSE_FILE" exec -T database sh -c 'mariadb -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" -e "'"$query"'"'
     elif command -v mysql &> /dev/null; then
         mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USERNAME" -p"$DB_PASSWORD" "$DB_DATABASE" -e "$query"
     elif command -v mariadb &> /dev/null; then
