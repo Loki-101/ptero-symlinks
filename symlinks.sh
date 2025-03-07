@@ -7,12 +7,17 @@ set -e
 PERMISSION_FIX_AGREED=0
 DOCKER_DETECTED=0
 COMPOSE_FILE=""
+CONFIG_LOADED=0
+CONFIG_FILE="/var/lib/ptero-symlinks/info"
 
 # Check if the script is run as root or with sudo
 if [ "$(id -u)" != "0" ]; then
     echo "This script must be run as root or with sudo." 1>&2
     exit 1
 fi
+
+# Get the real user (even when run with sudo)
+REAL_USER=${SUDO_USER:-$(whoami)}
 
 # Function to extract database info from docker-compose.yml
 extract_db_info_from_compose() {
@@ -33,7 +38,6 @@ extract_db_info_from_compose() {
     # Set default values for host and port
     DB_HOST="127.0.0.1"
     DB_PORT="3306"
-
     DOCKER_DETECTED=1
     COMPOSE_FILE=$compose_file
 }
@@ -65,6 +69,14 @@ find_wings_config_path() {
     fi
     
     echo "$wings_path"
+}
+
+cleanup_ssh() {
+    if [ -n "$SSH_PID" ] && kill -0 $SSH_PID 2>/dev/null; then
+        echo "Cleaning up SSH tunnel..."
+        kill $SSH_PID 2>/dev/null
+    fi
+    echo "Exiting."
 }
 
 # Load database variables
@@ -121,6 +133,125 @@ else
     done
 fi
 
+# Check if configuration already exists
+if [ -f "$CONFIG_FILE" ] && grep -q "SSH_TUNNEL=true" "$CONFIG_FILE"; then
+    echo "Found existing SSH tunnel configuration. Loading settings..."
+    source "$CONFIG_FILE"
+    
+    # Set a flag to indicate configuration is loaded
+    CONFIG_LOADED=1
+    chmod +x $CONFIG_FILE
+    
+    echo "Using saved SSH tunnel configuration for $SSH_USER@$SSH_HOST:$SSH_PORT"
+    
+else
+    # No existing configuration found, proceed with setup
+    if [ -z "$DB_USERNAME" ]; then
+        echo "This node is on a separate machine from the database. Please enter the following information:"
+        read -p "Enter DB_USERNAME: " DB_USERNAME
+        read -p "Enter DB_PASSWORD: " DB_PASSWORD
+        read -p "Enter DB_PORT: " DB_PORT
+        read -p "Enter DB_DATABASE: " DB_DATABASE
+        
+        echo "Enter DB Host or \"tunnel\" for SSH Tunneling"
+        read -p "Enter DB_HOST: " DB_HOST
+        if [ "$DB_HOST" == "tunnel" ]; then
+            SSH_TUNNEL=true
+            read -p "Enter SSH Host: " SSH_HOST
+            read -p "Enter SSH Port: " SSH_PORT
+            read -p "Enter SSH User: " SSH_USER
+            read -p "Enter Remote DB Host (usually localhost): " REMOTE_DB_HOST
+            read -p "Enter Private SSH Key Path (Must have permission to login as your user): " SSH_KEY_PATH
+
+            # Dependency Check
+            if ! command -v ssh &> /dev/null; then
+                echo "SSH is not installed. Please install it and try again."
+                exit 1
+            fi
+
+            # Check if the SSH key file exists
+            if [ ! -f "$SSH_KEY_PATH" ]; then
+                echo "SSH key file does not exist at $SSH_KEY_PATH. Please provide a valid path."
+                exit 1
+            fi
+
+            # Check if the SSH key file has correct permissions (must be 600 or 400)
+            KEY_PERMS=$(stat -c "%a" "$SSH_KEY_PATH")
+            if [ "$KEY_PERMS" != "600" ] && [ "$KEY_PERMS" != "400" ]; then
+                echo "Warning: SSH private key $SSH_KEY_PATH has incorrect permissions ($KEY_PERMS)."
+                echo "SSH requires private keys to have permissions 600 (user read/write) or 400 (user read only)."
+                echo "Fixing permissions to 600..."
+                if chmod 600 "$SSH_KEY_PATH"; then
+                    echo "Changed permissions for $SSH_KEY_PATH to 600."
+                else
+                    echo "Failed to change permissions. Please fix manually with: chmod 600 $SSH_KEY_PATH"
+                    exit 1
+                fi
+            fi
+
+            # Ask if the user wants to save this configuration
+            while true; do
+                read -p "Would you like to save this SSH tunnel configuration system-wide? (y/n): " save_config
+                if echo "$save_config" | grep -iq "^y" || echo "$save_config" | grep -iq "^n"; then
+                    break
+                else
+                    echo "Invalid input. Please type y or n."
+                fi
+            done
+
+            if echo "$save_config" | grep -iq "^y"; then
+                echo "Saving SSH tunnel configuration to $CONFIG_FILE"
+                
+                # Create directory if it doesn't exist
+                sudo mkdir -p "$(dirname "$CONFIG_FILE")" 2>/dev/null
+                
+                # Create or update config file
+                sudo tee "$CONFIG_FILE" > /dev/null << EOF
+SSH_TUNNEL=$SSH_TUNNEL
+SSH_HOST=$SSH_HOST
+SSH_PORT=$SSH_PORT
+SSH_USER=$SSH_USER
+REMOTE_DB_HOST=$REMOTE_DB_HOST
+DB_PORT=$DB_PORT
+SSH_KEY_PATH=$SSH_KEY_PATH
+DB_USERNAME=$DB_USERNAME
+DB_PASSWORD=$DB_PASSWORD
+DB_DATABASE=$DB_DATABASE
+EOF
+                echo "Configuration saved."
+            fi
+
+            echo "Setting up SSH tunnel to $SSH_HOST:$SSH_PORT..."
+            
+            # Start the SSH tunnel in the background
+            SSH_CMD="ssh -i $SSH_KEY_PATH -N -L 59781:$REMOTE_DB_HOST:$DB_PORT $SSH_USER@$SSH_HOST -p $SSH_PORT"
+            echo "Running: $SSH_CMD"
+            
+            $SSH_CMD&
+            SSH_PID=$!
+            trap cleanup_ssh INT TERM EXIT
+            echo "Sleeping 5 seconds to allow SSH tunnel to establish..."
+            sleep 5
+        fi
+    fi
+fi
+
+# If loading from config, start SSH tunnel
+if [[ -f "$CONFIG_FILE" && $SSH_TUNNEL = true ]]; then
+    echo "Setting up SSH tunnel to $SSH_HOST:$SSH_PORT..."
+    
+    # Start the SSH tunnel in the background
+    SSH_CMD="ssh -i $SSH_KEY_PATH -N -L 59781:$REMOTE_DB_HOST:$DB_PORT $SSH_USER@$SSH_HOST -p $SSH_PORT"
+    echo "Running: $SSH_CMD"
+    
+    # Start tunnel in background
+    $SSH_CMD&
+    SSH_PID=$!
+    trap cleanup_ssh INT TERM EXIT
+    echo "Sleeping 5 seconds to allow SSH tunnel to establish..."
+    sleep 5
+fi
+
 # Get "data" path from config.yml file
 if [ $DOCKER_DETECTED -eq 1 ]; then
     config_path=$(find_wings_config_path "$COMPOSE_FILE")
@@ -150,9 +281,6 @@ if [ -z "$node_uuid" ]; then
 fi
 
 echo "Node UUID: $node_uuid"
-
-# Get the real user (even when run with sudo)
-REAL_USER=${SUDO_USER:-$(whoami)}
 
 # Split the data_path into an array of directories
 IFS="/" read -ra DIRS <<< "$data_path"
@@ -196,15 +324,19 @@ done
 # Function to execute MySQL query
 execute_mysql_query() {
     local query="$1"
-    if [ $DOCKER_DETECTED -eq 1 ]; then
+    if [ $SSH_TUNNEL = true ]; then
+        DB_PORT=59781
+    fi
+    
+    if [[ $DOCKER_DETECTED -eq 1 && $SSH_TUNNEL != true ]]; then
         echo "Executing query in Docker environment..."
         docker compose -f "$COMPOSE_FILE" exec -T database sh -c 'mariadb -u"$MYSQL_USER" -p"$MYSQL_PASSWORD" "$MYSQL_DATABASE" -e "'"$query"'"'
-    elif command -v mysql &> /dev/null; then
-        mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USERNAME" -p"$DB_PASSWORD" "$DB_DATABASE" -e "$query"
     elif command -v mariadb &> /dev/null; then
-        mariadb -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USERNAME" -p"$DB_PASSWORD" "$DB_DATABASE" -e "$query"
+        mariadb -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USERNAME" -p$DB_PASSWORD "$DB_DATABASE" -e "$query"
+    elif command -v mysql &> /dev/null; then
+        mysql -h"$DB_HOST" -P"$DB_PORT" -u"$DB_USERNAME" -p$DB_PASSWORD "$DB_DATABASE" -e "$query"
     else
-        echo "Error: Neither MySQL client nor Docker Compose setup found. Cannot execute database query."
+        echo "Error: Neither MySQL, MariaDB client nor local Docker Compose setup including the database found."
         exit 1
     fi
 }
