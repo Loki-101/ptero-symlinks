@@ -9,6 +9,7 @@ Automatically creates symlinks for Pterodactyl Servers in the user's home direct
     DB_PASSWORD=""
     ```
 - Compatible with running your panel inside a compose stack if run in the same directory as your panel's docker-compose.yml file or if the compose file is located at /srv/pterodactyl/docker-compose.yml
+- Supports using an SSH Tunnel to connect to the panel database instead of connecting directly via the above method
 
 # Dependencies:
 ## ACL (Access Control List)
