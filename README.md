@@ -1,6 +1,6 @@
 # ptero-symlinks
 Automatically creates symlinks for Pterodactyl Servers in the user's home directory based on their human readable name
-- Should be run from the WINGS machine; if the panel is not hosted on the same machine, you will have to enter the information to connect to your panel's database manually. Once you'd verified it works, you can create a file at /var/www/pterodactyl/.env with the following variables filled out so you don't have to enter it manually each time (The database will have to be open to outside connections from your Wings machine's IP; you can always make a new user for this with read access on the panel database):
+- Should be run from the WINGS machine; if the panel is not hosted on the same machine, you will have to enter the information to connect to your panel's database manually. Once you've verified it works, you can create a file at /var/www/pterodactyl/.env with the following variables filled out so you don't have to enter it manually each time (The database will have to be open to outside connections from your Wings machine's IP; you can always make a new user for this with read access on the panel database):
   - ```
     DB_HOST=
     DB_PORT=
