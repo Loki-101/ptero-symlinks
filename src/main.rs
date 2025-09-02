@@ -293,3 +293,40 @@ fn check_group_acl_permissions(paths: &[PathBuf], gname: &str) -> Result<()> {
     
     Ok(())
 }
+
+fn set_group_acl_permissions(paths: &[PathBuf], gname: &str) -> Result<()> {
+    use std::process::Command;
+    use std::collections::HashSet;
+    
+    let mut dirs_to_process = HashSet::new();
+    
+    for path in paths {
+        if path.is_dir() {
+            dirs_to_process.insert(path.clone());
+        }
+        
+        let mut current = path.clone();
+        while let Some(parent) = current.parent() {
+            if parent == Path::new("/") {
+                break;
+            }
+            dirs_to_process.insert(parent.to_path_buf());
+            current = parent.to_path_buf();
+        }
+    }
+    
+    for dir in dirs_to_process {
+        let status = Command::new("setfacl")
+            .arg("-m")
+            .arg(format!("g:{}:rx", gname))
+            .arg(&dir)
+            .status()
+            .with_context(|| format!("Failed to set ACL on {}", dir.display()))?;
+        
+        if !status.success() {
+            eprintln!("warning: setfacl failed for {}", dir.display());
+        }
+    }
+    
+    Ok(())
+}
