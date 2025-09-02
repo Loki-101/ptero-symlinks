@@ -56,8 +56,6 @@ fn run() -> Result<()> {
 }
 
 fn env_cfg() -> Result<(String, String, PathBuf)> {
-    if get_current_uid() != 0 { bail!("must run as root/sudo"); }
-
     let real_user = env::var("SUDO_USER").ok().filter(|s| !s.is_empty())
         .or_else(|| get_user_by_uid(get_current_uid()).map(|u| u.name().to_string_lossy().into_owned()))
         .ok_or_else(|| anyhow!("cannot resolve real user"))?;
