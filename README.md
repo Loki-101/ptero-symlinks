@@ -6,7 +6,7 @@
 ## Install
 ```bash
 sudo -i
-export INSTALL_TO="/usr/local/bin"
+export INSTALL_TO="/usr/local/share/ptero-symlinks"
 ```
 
 ```bash
@@ -24,10 +24,10 @@ PANEL_FQDN="https://panel.example.com"
 API_KEY="YOUR_CLIENT_API_KEY"
 WINGS_CONFIG="/srv/pterodactyl/wings/config.yml"
 
-/usr/local/bin/symlinks "$@"
+/usr/local/share/ptero-symlinks/symlinks "$@"
 EOF
 
-sudo chmod +x /usr/bin/symlinks
+sudo chmod +x /usr/local/share/ptero-symlinks/symlinks
 ```
 You can edit this alias in case you need to change anything later with:
 ```bash
