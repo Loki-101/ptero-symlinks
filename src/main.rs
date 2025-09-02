@@ -170,23 +170,52 @@ fn group_management(gid: u32, username: &str, link_dir: &Path, data_dir: &Path) 
         let uname_os: OsString = u.name().to_os_string();
         let uname_disp = u.name().to_string_lossy();
 
+        let Some(gname) = get_group_by_gid(gid)
+            .map(|g| g.name().to_string_lossy().into_owned())
+        else {
+            eprintln!("warning: group with gid {gid} not found; cannot modify membership.");
+            return;
+        };
+
+        let mut needs_group_add = false;
+        let mut needs_acl_fix = false;
+
         if let Some(gs) = get_user_groups(&uname_os, u.primary_group_id()) {
             if !gs.iter().any(|g| g.gid() == gid) {
-                let Some(gname) = get_group_by_gid(gid)
-                    .map(|g| g.name().to_string_lossy().into_owned())
-                else {
-                    eprintln!("warning: group with gid {gid} not found; cannot modify membership.");
-                    return;
-                };
+                needs_group_add = true;
+            }
+        }
 
-                eprintln!("note: '{}' is not in group '{}' (gid {gid}).", uname_disp, gname);
-                eprint!("Add now and set ACL permissions for the group? [y/N] ");
-                let _ = io::stderr().flush();
+        let paths = vec![link_dir.to_path_buf(), data_dir.to_path_buf()];
+        if let Err(_) = check_group_acl_permissions(&paths, &gname) {
+            needs_acl_fix = true;
+        }
 
-                let mut input = String::new();
-                if io::stdin().read_line(&mut input).is_ok() {
-                    let ans = input.trim().to_ascii_lowercase();
-                    if ans == "y" || ans == "yes" {
+        if needs_group_add || needs_acl_fix {
+            let prompt = match (needs_group_add, needs_acl_fix) {
+                (true, true) => {
+                    eprintln!("note: '{}' is not in group '{}' (gid {gid}) and ACL permissions are missing.", uname_disp, gname);
+                    "Add user to group and set ACL permissions? [y/N] "
+                }
+                (true, false) => {
+                    eprintln!("note: '{}' is not in group '{}' (gid {gid}).", uname_disp, gname);
+                    "Add user to group? [y/N] "
+                }
+                (false, true) => {
+                    eprintln!("note: ACL permissions for group '{}' are not properly set.", gname);
+                    "Set ACL permissions for group access? [y/N] "
+                }
+                (false, false) => unreachable!(),
+            };
+
+            eprint!("{}", prompt);
+            let _ = io::stderr().flush();
+
+            let mut input = String::new();
+            if io::stdin().read_line(&mut input).is_ok() {
+                let ans = input.trim().to_ascii_lowercase();
+                if ans == "y" || ans == "yes" {
+                    if needs_group_add {
                         match Command::new("usermod")
                             .arg("-a")
                             .arg("-G")
@@ -196,37 +225,40 @@ fn group_management(gid: u32, username: &str, link_dir: &Path, data_dir: &Path) 
                         {
                             Ok(s) if s.success() => {
                                 eprintln!("✔ added '{}' to group '{}'. You may need to re-login or run 'newgrp {}' to apply it.", uname_disp, gname, gname);
-                                
-                                let paths = vec![link_dir.to_path_buf(), data_dir.to_path_buf()];
-                                if let Err(e) = set_group_acl_permissions(&paths, &gname) {
-                                    eprintln!("warning: failed to set ACL permissions: {}", e);
-                                }
                             }
                             Ok(s) => {
                                 eprintln!("error: usermod exited with status {}", s);
+                                return;
                             }
                             Err(e) => {
                                 eprintln!("error: failed to run usermod: {e}");
+                                return;
                             }
                         }
-                    } else {
-                        eprintln!("skipped adding user to group.");
                     }
+
+                    if let Err(e) = set_group_acl_permissions(&paths, &gname) {
+                        eprintln!("warning: failed to set ACL permissions: {}", e);
+                    } else {
+                        eprintln!("✔ ACL permissions set for group '{}'.", gname);
+                    }
+                } else {
+                    eprintln!("skipped group and ACL setup.");
                 }
             }
         }
     }
 }
 
-fn set_group_acl_permissions(paths: &[PathBuf], gname: &str) -> Result<()> {
+fn check_group_acl_permissions(paths: &[PathBuf], gname: &str) -> Result<()> {
     use std::process::Command;
     use std::collections::HashSet;
     
-    let mut dirs_to_process = HashSet::new();
+    let mut dirs_to_check = HashSet::new();
     
     for path in paths {
         if path.is_dir() {
-            dirs_to_process.insert(path.clone());
+            dirs_to_check.insert(path.clone());
         }
         
         let mut current = path.clone();
@@ -234,21 +266,28 @@ fn set_group_acl_permissions(paths: &[PathBuf], gname: &str) -> Result<()> {
             if parent == Path::new("/") {
                 break;
             }
-            dirs_to_process.insert(parent.to_path_buf());
+            dirs_to_check.insert(parent.to_path_buf());
             current = parent.to_path_buf();
         }
     }
     
-    for dir in dirs_to_process {
-        let status = Command::new("setfacl")
-            .arg("-m")
-            .arg(format!("g:{}:rx", gname))
+    for dir in dirs_to_check {
+        let output = Command::new("getfacl")
+            .arg("--no-effective")
+            .arg("--absolute-names")
             .arg(&dir)
-            .status()
-            .with_context(|| format!("Failed to set ACL on {}", dir.display()))?;
+            .output()
+            .with_context(|| format!("Failed to get ACL for {}", dir.display()))?;
         
-        if !status.success() {
-            eprintln!("warning: setfacl failed for {}", dir.display());
+        if !output.status.success() {
+            bail!("getfacl failed for {}", dir.display());
+        }
+        
+        let acl_output = String::from_utf8_lossy(&output.stdout);
+        let expected_entry = format!("group:{}:r-x", gname);
+        
+        if !acl_output.lines().any(|line| line.trim() == expected_entry) {
+            bail!("Missing ACL entry '{}' for {}", expected_entry, dir.display());
         }
     }
     
