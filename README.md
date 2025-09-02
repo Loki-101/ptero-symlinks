@@ -54,8 +54,8 @@ nano /usr/bin/symlinks
 When to run:
 - Manually after server creation or deletion
 
-What happens when I run it after server creation or deletion?
-- It cleans up after itself; the reason we create the pterodactyl folder in your home is so we know only the symlinks we manage are inside it; we wipe all symlinks in that folder each time the script is run, then make new ones.
+What happens when I run it after server deletion?
+- It cleans up after itself; the reason we create the pterodactyl folder in your home is so we know only the symlinks we manage are inside it; we wipe any broken symlinks in that folder each time the script is run.
 
 Where will the symlinks be created?
 - In your home directory, inside a folder called pterodactyl
