@@ -6,7 +6,7 @@
 ## Install globally (recommended)
 ```bash
 sudo -i
-export INSTALL_TO="/usr/bin"
+export INSTALL_TO="/usr/local/bin"
 ```
 
 ## Install only for your user, or to a custom location
@@ -21,15 +21,22 @@ sudo chmod +x ${INSTALL_TO}/symlinks
 
 **REMEMBER TO CHANGE THESE 3 VARIABLES** to match **your** environment:
 ```bash
-echo 'alias symlinks="PANEL_FQDN=https://panel.example.com API_KEY=YOUR_CLIENT_API_KEY WINGS_CONFIG=/srv/pterodactyl/wings/config.yml /usr/local/bin/symlinks"' >> /etc/profile.d/ptero-symlinks.sh
-source /etc/profile.d/ptero-symlinks.sh
+sudo tee /usr/bin/symlinks >/dev/null <<'EOF'
+#!/bin/bash
+PANEL_FQDN="https://panel.example.com"
+API_KEY="YOUR_CLIENT_API_KEY"
+WINGS_CONFIG="/srv/pterodactyl/wings/config.yml"
+
+/usr/local/bin/symlinks "$@"
+EOF
+
+sudo chmod +x /usr/bin/symlinks
 ```
 You can edit this alias in case you need to change anything later with:
 ```bash
-nano /etc/profile.d/ptero-symlinks.sh
+nano /usr/bin/symlinks
 ```
 - In the nano text editor, you can save with Control+S, then exit with Control+X
-- After any change, ``source /etc/profile.d/ptero-symlinks.sh`` to load it into your current shell
 
 ## Notes:
 - The client API key *must* be from a panel administrator account
