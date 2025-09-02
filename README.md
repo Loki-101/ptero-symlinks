@@ -52,6 +52,7 @@ When to run:
 
 Where will the symlinks be created?
 - In your home directory, inside a folder called pterodactyl
+- If you became root to install the binary in the default location, type ``exit`` to go back to your user before running symlinks or they will be created in root's home instead of your own.
 
 Why are the symlinks named the way they are?
 - The symlinks will be named with their human readable server name followed by a dash and their short uuid
