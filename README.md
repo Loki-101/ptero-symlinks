@@ -1,3 +1,5 @@
+# ⚠️V6 currently under maintenance; continue using V5 until this warning is removed⚠️
+
 # symlinks
 ## Requirements
 - Either Amd64 or Aarch64 architecture
