@@ -2,6 +2,7 @@
 ## Requirements
 - Either Amd64 or Aarch64 architecture
 - Run on the Wings machine(s)
+- A Client API Key from a panel administrator account (Go to your panel -> Account Settings -> API Credentials to create one)
 - ACL (Access Control List)
   - RHEL Base: `dnf -y install acl`
   - Debian Base: `apt -y install acl`
