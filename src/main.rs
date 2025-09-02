@@ -49,7 +49,9 @@ fn run() -> Result<()> {
         made += 1;
     }
 
-    if let Some(gid) = system.user.gid { group_management(gid, &real_user); }
+    if let Some(gid) = system.user.gid { 
+        group_management(gid, &real_user, &link_dir, Path::new(&system.data));
+    }
 
     println!("OK — {} symlinks ready in {}", made, link_dir.display());
     Ok(())
@@ -65,6 +67,37 @@ fn env_cfg() -> Result<(String, String, PathBuf, String)> {
     let home = get_user_by_name(&real_user)
         .map(|u| u.home_dir().to_path_buf())
         .ok_or_else(|| anyhow!("home dir not found for {real_user}"))?;
+
+    use std::process::Command;
+    let setfacl_check = Command::new("which").arg("setfacl").output()
+        .map(|o| o.status.success()).unwrap_or(false);
+    let getfacl_check = Command::new("which").arg("getfacl").output()
+        .map(|o| o.status.success()).unwrap_or(false);
+    
+    if !setfacl_check || !getfacl_check {
+        bail!("ACL tools (setfacl/getfacl) not found. Please install acl package.");
+    }
+
+    let acl_test = Command::new("getfacl")
+        .arg("--no-effective")
+        .arg("--absolute-names")
+        .arg(&home)
+        .output();
+    
+    match acl_test {
+        Ok(output) if output.status.success() => {
+        }
+        Ok(output) if !output.status.success() => {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            if stderr.contains("Operation not supported") || stderr.contains("not supported") {
+                bail!("ACL is not enabled on the filesystem. Please mount with 'acl' option.");
+            }
+        }
+        Err(e) => {
+            bail!("Failed to verify ACL support: {}", e);
+        }
+        _ => {}
+    }
 
     let api_key = env::var("API_KEY").or_else(|_| env::var("PTERO_API_KEY")).context("API key missing")?;
     let mut panel = env::var("PANEL_FQDN").or_else(|_| env::var("PTERO_PANEL")).context("panel URL missing")?;
@@ -128,7 +161,7 @@ fn prune_dangling(dir: &Path) -> Result<()> {
 
 fn safe(s: &str) -> String { s.chars().map(|c| if c.is_ascii_alphanumeric() || "-_. ".contains(c) { c } else { '_' }).collect() }
 
-fn group_management(gid: u32, username: &str) {
+fn group_management(gid: u32, username: &str, link_dir: &Path, data_dir: &Path) {
     use std::io::{self, Write};
     use std::process::Command;
     use uzers::get_group_by_gid;
@@ -147,7 +180,7 @@ fn group_management(gid: u32, username: &str) {
                 };
 
                 eprintln!("note: '{}' is not in group '{}' (gid {gid}).", uname_disp, gname);
-                eprint!("Add now? [y/N] ");
+                eprint!("Add now and set ACL permissions for the group? [y/N] ");
                 let _ = io::stderr().flush();
 
                 let mut input = String::new();
@@ -163,6 +196,11 @@ fn group_management(gid: u32, username: &str) {
                         {
                             Ok(s) if s.success() => {
                                 eprintln!("✔ added '{}' to group '{}'. You may need to re-login or run 'newgrp {}' to apply it.", uname_disp, gname, gname);
+                                
+                                let paths = vec![link_dir.to_path_buf(), data_dir.to_path_buf()];
+                                if let Err(e) = set_group_acl_permissions(&paths, &gname) {
+                                    eprintln!("warning: failed to set ACL permissions: {}", e);
+                                }
                             }
                             Ok(s) => {
                                 eprintln!("error: usermod exited with status {}", s);
@@ -178,4 +216,41 @@ fn group_management(gid: u32, username: &str) {
             }
         }
     }
+}
+
+fn set_group_acl_permissions(paths: &[PathBuf], gname: &str) -> Result<()> {
+    use std::process::Command;
+    use std::collections::HashSet;
+    
+    let mut dirs_to_process = HashSet::new();
+    
+    for path in paths {
+        if path.is_dir() {
+            dirs_to_process.insert(path.clone());
+        }
+        
+        let mut current = path.clone();
+        while let Some(parent) = current.parent() {
+            if parent == Path::new("/") {
+                break;
+            }
+            dirs_to_process.insert(parent.to_path_buf());
+            current = parent.to_path_buf();
+        }
+    }
+    
+    for dir in dirs_to_process {
+        let status = Command::new("setfacl")
+            .arg("-m")
+            .arg(format!("g:{}:x", gname))
+            .arg(&dir)
+            .status()
+            .with_context(|| format!("Failed to set ACL on {}", dir.display()))?;
+        
+        if !status.success() {
+            eprintln!("warning: setfacl failed for {}", dir.display());
+        }
+    }
+    
+    Ok(())
 }
