@@ -27,7 +27,7 @@ WINGS_CONFIG="/srv/pterodactyl/wings/config.yml"
 ${INSTALL_TO}/symlinks "$@"
 EOF
 
-sudo chmod +x ${INSTALL_TO}/symlinks
+sudo chmod +x /usr/bin/symlinks
 ```
 You can edit this alias in case you need to change anything later with:
 ```bash
