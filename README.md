@@ -5,6 +5,7 @@
 
 ## Install globally (recommended)
 ```bash
+sudo -i
 export INSTALL_TO="/usr/local/bin"
 ```
 
@@ -43,7 +44,7 @@ nano /etc/profile.d/ptero-symlinks.sh
   - The first address in any subnet will typically be the gateway; refer to the above example if running the panel in a Docker container, adapting it to your needs.
 
 
-## Usage: ``symlinks``
+## Usage: ``symlinks`` if root, ``sudo symlinks`` if non-root user
 
 ## FAQ
 When to run:
