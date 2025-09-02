@@ -8,6 +8,7 @@ on:
       - "src/main.rs"
   schedule:
     - cron: "0 10 * * 1"
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -51,3 +52,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload "$LATEST_TAG" dist/symlinks-${{ matrix.target }} --clobber
+
