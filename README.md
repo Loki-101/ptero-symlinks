@@ -1,40 +1,74 @@
-# ptero-symlinks
-Automatically creates symlinks for Pterodactyl Servers in the user's home directory based on their human readable name
-- Should be run from the WINGS machine; if the panel is not hosted on the same machine, you will have to enter the information to connect to your panel's database manually. Once you've verified it works, you can create a file at /var/www/pterodactyl/.env with the following variables filled out so you don't have to enter it manually each time (The database will have to be open to outside connections from your Wings machine's IP; you can always make a new user for this with read access on the panel database):
-  - ```
-    DB_HOST=
-    DB_PORT=
-    DB_USERNAME=
-    DB_DATABASE=
-    DB_PASSWORD=""
-    ```
-- Compatible with running your panel inside a compose stack if run in the same directory as your panel's docker-compose.yml file or if the compose file is located at /srv/pterodactyl/docker-compose.yml
-- Supports using an SSH Tunnel to connect to the panel database instead of connecting directly via the above method
+# symlinks
+## Requirements
+- Either Amd64 or Aarch64 architecture
+- Run on the Wings machine(s)
 
-# Dependencies:
-## ACL (Access Control List)
-- RHEL Base: `dnf -y install acl`
-- Debian Base: `apt -y install acl`
-## MariaDB or MySQL Client
-- The package names differ more than acl in various distributions, but it will usually be along the lines of mariadb-client or mysql-client.
-
-# Download from Linux Command Line
+## Install globally (recommended)
 ```bash
-wget https://raw.githubusercontent.com/Loki-101/ptero-symlinks/main/symlinks.sh
-chmod +x symlinks.sh
+sudo -i
+```
+```bash
+export INSTALL_TO="/usr/local/bin"
 ```
 
-# Usage as a normal user:
-sudo ./symlinks.sh
+## Install only for your user, or to a custom location
+export INSTALL_TO=/home/$USER/.local/bin
 
-![user](https://github.com/Loki-101/ptero-symlinks/assets/59907407/517f0be6-4dc8-43c4-9136-fd44271c1613)
+```bash
+mkdir -p ${INSTALL_TO}
+# Instructions are for AMD by default; if on Arm, change the ending to symlinks-aarch64-unknown-linux-musl to download the correct binary for your system
+wget -O ${INSTALL_TO}/symlinks https://github.com/Loki-101/ptero-symlinks/releases/latest/download/symlinks-x86_64-unknown-linux-musl
+chmod +x ${INSTALL_TO}/symlinks
+```
 
-# Usage as root:
-./symlinks.sh
+**REMEMBER TO CHANGE THESE 3 VARIABLES** to match **your** environment:
+```bash
+echo 'alias symlinks="PANEL_FQDN=https://panel.example.com API_KEY=YOUR_CLIENT_API_KEY WINGS_CONFIG=/srv/pterodactyl/wings/config.yml /usr/local/bin/symlinks"' >> ~/.bashrc
+source ~/.bashrc
+```
+You can edit this alias in case you need to change anything later with:
+```bash
+nano ~/.bashrc
+```
+- In the nano text editor, you can save with Control+S, then exit with Control+X
+- After any change, ``source ~/.bashrc`` to load it into your current shell
 
-![root](https://github.com/Loki-101/ptero-symlinks/assets/59907407/41f18113-4a9e-40bd-be95-0419cd4d9d2f)
+## Notes:
+- The client API key *must* be from a panel administrator account
+- It is recommended to create one API key per Wings machine so you can use the "Allowed IPs" section when creating it
+- Allowed IPs is from your panel's perspective; examples below:
+  - Panel and Wings are on the same machine, both running normally
+    - ``127.0.0.1``
+  - Panel and Wings are on different machines, and the public IP of the Wings machine is "123.456.789.10"
+    - ``123.456.789.10``
+  - The panel in running as a Docker container, and you told it to use the subnet "172.20.0.0/24"
+    - ``172.20.0.1``
+  - The first address in any subnet will typically be the gateway; refer to the above example if running the panel in a Docker container, adapting it to your needs.
 
-# End result:
-In your home folder, so depending on who you ran the script on either in /root or in /home/your-user you will now have folders with human readable names for all your Pterodactyl Panel servers. If you have two servers with the same name a 1 will be appended to the first one, and it will keep increasing. For example, Redbot1 and Redbot2 symlinks will be created if you have two servers named Redbot.
-![image](https://github.com/Loki-101/ptero-symlinks/assets/59907407/79cbf8f7-a948-4bf2-a465-ff0882deccf2)
 
+## Usage: ``symlinks``
+
+## FAQ
+When to run:
+- Manually after server creation or deletion
+
+Where will the symlinks be created?
+- In your home directory, inside a folder called pterodactyl
+
+Why are the symlinks named the way they are?
+- The symlinks will be named with their human readable server name followed by a dash and their short uuid
+- This is the best compromise for staying human-readable without worrying about conflicts from two servers having the same human readable name
+
+Example:
+```bash
+[root@pterodactyl ~]# ls /root
+
+[root@pterodactyl ~]# symlinks
+OK — 1 symlinks ready in /root/pterodactyl
+[root@pterodactyl ~]# ls /root
+pterodactyl
+[root@pterodactyl ~]# ls /root/pterodactyl/
+'Overwatch MapVote Bot-06435f2c'
+[root@pterodactyl ~]# ls /root/pterodactyl/Overwatch\ MapVote\ Bot-06435f2c/
+app.py  requirements.txt
+```
