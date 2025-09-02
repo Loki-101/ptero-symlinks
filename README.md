@@ -12,10 +12,10 @@ export INSTALL_TO="/usr/local/bin"
 export INSTALL_TO=/home/$USER/.local/bin
 
 ```bash
-mkdir -p ${INSTALL_TO}
+sudo mkdir -p ${INSTALL_TO}
 # Instructions are for AMD by default; if on Arm, change the ending to symlinks-aarch64-unknown-linux-musl to download the correct binary for your system
-wget -O ${INSTALL_TO}/symlinks https://github.com/Loki-101/ptero-symlinks/releases/latest/download/symlinks-x86_64-unknown-linux-musl
-chmod +x ${INSTALL_TO}/symlinks
+sudo wget -O ${INSTALL_TO}/symlinks https://github.com/Loki-101/ptero-symlinks/releases/latest/download/symlinks-x86_64-unknown-linux-musl
+sudo chmod +x ${INSTALL_TO}/symlinks
 ```
 
 **REMEMBER TO CHANGE THESE 3 VARIABLES** to match **your** environment:
