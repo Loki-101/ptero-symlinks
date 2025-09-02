@@ -1,0 +1,59 @@
+name: build
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+  schedule:
+    - cron: "0 10 * * 1"
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: Unit tests (native)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust toolchain (1.89)
+        uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: 1.89.0
+          profile: minimal
+      - name: Cache cargo/target
+        uses: Swatinem/rust-cache@v2
+      - name: Run tests
+        run: cargo test --verbose
+
+  build:
+    name: Build ${{ matrix.target }} (release, musl)
+    needs: test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - x86_64-unknown-linux-musl
+          - aarch64-unknown-linux-musl
+    steps:
+      - uses: actions/checkout@v4
+      - name: Cross-compile (release)
+        id: cross
+        uses: houseabsolute/actions-rust-cross@v1
+        with:
+          toolchain: 1.89.0
+          target: ${{ matrix.target }}
+          command: build
+          args: --locked --release
+          use-rust-cache: true
+      - name: Prepare artifact
+        run: |
+          mkdir -p dist
+          cp target/${{ matrix.target }}/release/symlinks dist/symlinks-${{ matrix.target }}
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: symlinks-${{ matrix.target }}
+          path: dist/symlinks-${{ matrix.target }}
