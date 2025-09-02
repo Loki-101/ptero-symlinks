@@ -108,7 +108,7 @@ EOF
 [root@node1 ~]# symlinks
 OK — 1 symlinks ready in /root/pterodactyl
 [root@node1 ~]# ls
-app.py  pterodactyl  run.sh  videos
+pterodactyl
 [root@node1 ~]# ls pterodactyl/
 'Overwatch MapVote Bot-06435f2c'
 [root@node1 ~]# ls pterodactyl/Overwatch\ MapVote\ Bot-06435f2c/
