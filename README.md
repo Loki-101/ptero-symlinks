@@ -6,7 +6,7 @@
   - RHEL Base: `dnf -y install acl`
   - Debian Base: `apt -y install acl`
   - Arch Base: `pacman -S acl`
-  - SUSE Base: `zypper install acl`
+  - SUSE Base: `zypper in acl`
   - Gentoo Base: `emerge acl`
 
 ## Install
