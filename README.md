@@ -6,7 +6,7 @@
 ## Install globally (recommended)
 ```bash
 sudo -i
-export INSTALL_TO="/usr/local/bin"
+export INSTALL_TO="/usr/bin"
 ```
 
 ## Install only for your user, or to a custom location
