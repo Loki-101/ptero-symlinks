@@ -3,14 +3,11 @@
 - Either Amd64 or Aarch64 architecture
 - Run on the Wings machine(s)
 
-## Install globally (recommended)
+## Install
 ```bash
 sudo -i
 export INSTALL_TO="/usr/local/bin"
 ```
-
-## Install only for your user, or to a custom location
-export INSTALL_TO=/home/$USER/.local/bin
 
 ```bash
 sudo mkdir -p ${INSTALL_TO}
