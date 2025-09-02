@@ -27,7 +27,7 @@ struct Server { uuid: String, name: String }
 fn main() { if let Err(e) = run() { eprintln!("{e:#}"); std::process::exit(1); } }
 
 fn run() -> Result<()> {
-    let (api_key, panel, home) = env_cfg()?;
+    let (api_key, panel, home, real_user) = env_cfg()?;
     let WingsConfig { uuid: node_uuid, system } = read_wings_config(&env::var("WINGS_CONFIG").unwrap_or_else(|_| DEFAULT_WINGS_CONFIG.into()))?;
 
     let node_id = fetch_node_id(&panel, &api_key, &node_uuid)?;
@@ -49,13 +49,13 @@ fn run() -> Result<()> {
         made += 1;
     }
 
-    if let Some(gid) = system.user.gid { group_management(gid); }
+    if let Some(gid) = system.user.gid { group_management(gid, &real_user); }
 
     println!("OK — {} symlinks ready in {}", made, link_dir.display());
     Ok(())
 }
 
-fn env_cfg() -> Result<(String, String, PathBuf)> {
+fn env_cfg() -> Result<(String, String, PathBuf, String)> {
     if get_current_uid() != 0 { bail!("must run as root/sudo"); }
 
     let real_user = env::var("SUDO_USER").ok().filter(|s| !s.is_empty())
@@ -71,7 +71,7 @@ fn env_cfg() -> Result<(String, String, PathBuf)> {
     if !(panel.starts_with("http://") || panel.starts_with("https://")) { bail!("panel must start with http:// or https://"); }
     while panel.ends_with('/') { panel.pop(); }
 
-    Ok((api_key, panel, home))
+    Ok((api_key, panel, home, real_user))
 }
 
 fn read_wings_config(p: impl AsRef<Path>) -> Result<WingsConfig> {
@@ -128,12 +128,12 @@ fn prune_dangling(dir: &Path) -> Result<()> {
 
 fn safe(s: &str) -> String { s.chars().map(|c| if c.is_ascii_alphanumeric() || "-_. ".contains(c) { c } else { '_' }).collect() }
 
-fn group_management(gid: u32) {
+fn group_management(gid: u32, username: &str) {
     use std::io::{self, Write};
     use std::process::Command;
     use uzers::get_group_by_gid;
 
-    if let Some(u) = get_user_by_uid(get_current_uid()) {
+    if let Some(u) = get_user_by_name(username) {
         let uname_os: OsString = u.name().to_os_string();
         let uname_disp = u.name().to_string_lossy();
 
