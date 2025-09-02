@@ -24,7 +24,7 @@ PANEL_FQDN="https://panel.example.com"
 API_KEY="YOUR_CLIENT_API_KEY"
 WINGS_CONFIG="/srv/pterodactyl/wings/config.yml"
 
-/usr/local/share/ptero-symlinks/symlinks "$@"
+${INSTALL_TO}/symlinks "$@"
 EOF
 
 sudo chmod +x /usr/local/share/ptero-symlinks/symlinks
