@@ -242,7 +242,7 @@ fn set_group_acl_permissions(paths: &[PathBuf], gname: &str) -> Result<()> {
     for dir in dirs_to_process {
         let status = Command::new("setfacl")
             .arg("-m")
-            .arg(format!("g:{}:x", gname))
+            .arg(format!("g:{}:rx", gname))
             .arg(&dir)
             .status()
             .with_context(|| format!("Failed to set ACL on {}", dir.display()))?;
