@@ -2,6 +2,12 @@
 ## Requirements
 - Either Amd64 or Aarch64 architecture
 - Run on the Wings machine(s)
+- ACL (Access Control List)
+  - RHEL Base: `dnf -y install acl`
+  - Debian Base: `apt -y install acl`
+  - Arch Base: `pacman -S acl`
+  - SUSE Base: `zypper install acl`
+  - Gentoo Base: `emerge acl`
 
 ## Install
 ```bash
