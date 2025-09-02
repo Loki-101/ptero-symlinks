@@ -3,16 +3,19 @@ name: build
 on:
   push:
     branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    paths:
+      - "Cargo.toml"
+      - "src/main.rs"
   schedule:
     - cron: "0 10 * * 1"
+
+permissions:
+  contents: write
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-
   build:
     name: Build ${{ matrix.target }} (release, musl)
     runs-on: ubuntu-latest
@@ -25,7 +28,6 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Cross-compile (release)
-        id: cross
         uses: houseabsolute/actions-rust-cross@v1
         with:
           toolchain: 1.89.0
@@ -37,9 +39,8 @@ jobs:
         run: |
           mkdir -p dist
           cp target/${{ matrix.target }}/release/symlinks dist/symlinks-${{ matrix.target }}
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: symlinks-${{ matrix.target }}
-          path: dist/symlinks-${{ matrix.target }}
-
+      - name: Publish to release tag V6
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release upload V6 dist/symlinks-${{ matrix.target }} --clobber
