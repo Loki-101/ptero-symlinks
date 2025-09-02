@@ -20,7 +20,7 @@ sudo chmod +x ${INSTALL_TO}/symlinks
 
 **REMEMBER TO CHANGE THESE 3 VARIABLES** to match **your** environment:
 ```bash
-sudo tee /usr/bin/symlinks >/dev/null <<'EOF'
+sudo tee /usr/bin/symlinks >/dev/null <<EOF
 #!/bin/bash
 PANEL_FQDN="https://panel.example.com"
 API_KEY="YOUR_CLIENT_API_KEY"
