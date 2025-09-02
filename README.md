@@ -5,9 +5,6 @@
 
 ## Install globally (recommended)
 ```bash
-sudo -i
-```
-```bash
 export INSTALL_TO="/usr/local/bin"
 ```
 
