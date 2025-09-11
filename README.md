@@ -27,9 +27,9 @@ sudo chmod +x ${INSTALL_TO}/symlinks
 ```bash
 sudo tee /usr/bin/symlinks >/dev/null <<EOF
 #!/bin/bash
-PANEL_FQDN="https://panel.example.com"
-API_KEY="YOUR_CLIENT_API_KEY"
-WINGS_CONFIG="/srv/pterodactyl/wings/config.yml"
+export PANEL_FQDN="https://panel.example.com"
+export API_KEY="YOUR_CLIENT_API_KEY"
+export WINGS_CONFIG="/srv/pterodactyl/wings/config.yml"
 
 ${INSTALL_TO}/symlinks "$@"
 EOF
