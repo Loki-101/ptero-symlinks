@@ -1,5 +1,4 @@
 name: build
-
 on:
   push:
     branches: [ "main" ]
@@ -9,17 +8,26 @@ on:
   schedule:
     - cron: "0 10 * * 1"
   workflow_dispatch:
-
 permissions:
   contents: write
-
 env:
   CARGO_TERM_COLOR: always
-  LATEST_TAG: V6
-
 jobs:
+  version:
+    name: Read version from Cargo.toml
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.get.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extract version
+        id: get
+        run: |
+          ver=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)"/\1/')
+          echo "tag=v${ver}" >> "$GITHUB_OUTPUT"
   build:
     name: Build ${{ matrix.target }} (release, musl)
+    needs: version
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -45,11 +53,11 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          if ! gh release view "$LATEST_TAG" >/dev/null 2>&1; then
-            gh release create "$LATEST_TAG" -t "$LATEST_TAG" -n "Automated musl builds"
+          TAG="${{ needs.version.outputs.tag }}"
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            gh release create "$TAG" -t "$TAG" -n "Automated musl builds — $TAG"
           fi
       - name: Publish to release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "$LATEST_TAG" dist/symlinks-${{ matrix.target }} --clobber
-
+        run: gh release upload "${{ needs.version.outputs.tag }}" dist/symlinks-${{ matrix.target }} --clobber
