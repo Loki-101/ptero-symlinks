@@ -1,18 +1,26 @@
+// ── Imports ─────────────────────────────────────────────────────────────────
+
 use anyhow::{anyhow, bail, Context, Result};
 use serde::Deserialize;
 use serde_json::Value as Json;
+use std::collections::HashSet;
 use std::env;
-use std::fs;
-use std::io::Read;
-use std::os::unix::fs as unix_fs;
 use std::ffi::OsString;
+use std::fs;
+use std::io::{self, Read, Write};
+use std::os::unix::fs as unix_fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use uzers::{get_current_uid, get_user_by_name, get_user_by_uid, get_user_groups, os::unix::UserExt};
+
+// ── Platform Guard & Constants ──────────────────────────────────────────────
 
 #[cfg(not(target_os = "linux"))]
 compile_error!("Linux-only");
 
 static DEFAULT_WINGS_CONFIG: &str = "/etc/pterodactyl/config.yml";
+
+// ── Types ───────────────────────────────────────────────────────────────────
 
 #[derive(Deserialize)]
 struct WingsConfig { uuid: String, system: System }
@@ -24,7 +32,44 @@ struct SystemUser { gid: Option<u32> }
 #[derive(Clone, Debug)]
 struct Server { uuid: String, name: String }
 
+// ── Macros ──────────────────────────────────────────────────────────────────
+
+/// Unwraps an Option, or bails with the given message.
+macro_rules! unwrap_or_bail {
+    ($opt:expr, $($msg:tt)*) => {
+        $opt.ok_or_else(|| anyhow!($($msg)*))?
+    };
+}
+
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+/// Checks whether a command exists on the system via `which`.
+fn has_command(name: &str) -> bool {
+    Command::new("which").arg(name).output()
+        .map(|o| o.status.success()).unwrap_or(false)
+}
+
+fn safe(s: &str) -> String { s.chars().map(|c| if c.is_ascii_alphanumeric() || "-_. ".contains(c) { c } else { '_' }).collect() }
+
+fn collect_dirs_and_ancestors(paths: &[PathBuf]) -> HashSet<PathBuf> {
+    let mut dirs = HashSet::new();
+    for path in paths {
+        if path.is_dir() { dirs.insert(path.clone()); }
+        let mut current = path.clone();
+        while let Some(parent) = current.parent() {
+            if parent == Path::new("/") { break; }
+            dirs.insert(parent.to_path_buf());
+            current = parent.to_path_buf();
+        }
+    }
+    dirs
+}
+
+// ── Entry Point ─────────────────────────────────────────────────────────────
+
 fn main() { if let Err(e) = run() { eprintln!("{e:#}"); std::process::exit(1); } }
+
+// ── Core Logic ──────────────────────────────────────────────────────────────
 
 fn run() -> Result<()> {
     let (api_key, panel, home, real_user) = env_cfg()?;
@@ -60,21 +105,19 @@ fn run() -> Result<()> {
 fn env_cfg() -> Result<(String, String, PathBuf, String)> {
     if get_current_uid() != 0 { bail!("must run as root/sudo"); }
 
-    let real_user = env::var("SUDO_USER").ok().filter(|s| !s.is_empty())
-        .or_else(|| get_user_by_uid(get_current_uid()).map(|u| u.name().to_string_lossy().into_owned()))
-        .ok_or_else(|| anyhow!("cannot resolve real user"))?;
+    let real_user = unwrap_or_bail!(
+        env::var("SUDO_USER").ok().filter(|s| !s.is_empty())
+            .or_else(|| get_user_by_uid(get_current_uid())
+                .map(|u| u.name().to_string_lossy().into_owned())),
+        "cannot resolve real user"
+    );
 
-    let home = get_user_by_name(&real_user)
-        .map(|u| u.home_dir().to_path_buf())
-        .ok_or_else(|| anyhow!("home dir not found for {real_user}"))?;
+    let home = unwrap_or_bail!(
+        get_user_by_name(&real_user).map(|u| u.home_dir().to_path_buf()),
+        "home dir not found for {real_user}"
+    );
 
-    use std::process::Command;
-    let setfacl_check = Command::new("which").arg("setfacl").output()
-        .map(|o| o.status.success()).unwrap_or(false);
-    let getfacl_check = Command::new("which").arg("getfacl").output()
-        .map(|o| o.status.success()).unwrap_or(false);
-    
-    if !setfacl_check || !getfacl_check {
+    if !has_command("setfacl") || !has_command("getfacl") {
         bail!("ACL tools (setfacl/getfacl) not found. Please install acl package.");
     }
 
@@ -107,6 +150,8 @@ fn env_cfg() -> Result<(String, String, PathBuf, String)> {
     Ok((api_key, panel, home, real_user))
 }
 
+// ── Config ──────────────────────────────────────────────────────────────────
+
 fn read_wings_config(p: impl AsRef<Path>) -> Result<WingsConfig> {
     let mut s = String::new();
     fs::File::open(p.as_ref())?.read_to_string(&mut s)?;
@@ -115,6 +160,8 @@ fn read_wings_config(p: impl AsRef<Path>) -> Result<WingsConfig> {
     if cfg.system.data.trim().is_empty() { bail!("missing system.data in config.yml"); }
     Ok(cfg)
 }
+
+// ── API ─────────────────────────────────────────────────────────────────────
 
 fn fetch_node_id(panel: &str, key: &str, uuid: &str) -> Result<u64> {
     let url = format!("{}/api/application/nodes", panel);
@@ -154,16 +201,16 @@ fn fetch_servers_on_node(panel: &str, key: &str, node_id: u64) -> Result<Vec<Ser
     Ok(out)
 }
 
+// ── Filesystem Utilities ────────────────────────────────────────────────────
+
 fn prune_dangling(dir: &Path) -> Result<()> {
     for e in fs::read_dir(dir)? { let p = e?.path(); if p.symlink_metadata()?.file_type().is_symlink() { if let Ok(t) = fs::read_link(&p) { if !t.exists() { let _ = fs::remove_file(&p); } } } }
     Ok(())
 }
 
-fn safe(s: &str) -> String { s.chars().map(|c| if c.is_ascii_alphanumeric() || "-_. ".contains(c) { c } else { '_' }).collect() }
+// ── Group & ACL Management ──────────────────────────────────────────────────
 
 fn group_management(gid: u32, username: &str, link_dir: &Path, data_dir: &Path) {
-    use std::io::{self, Write};
-    use std::process::Command;
     use uzers::get_group_by_gid;
 
     if let Some(u) = get_user_by_name(username) {
@@ -251,82 +298,42 @@ fn group_management(gid: u32, username: &str, link_dir: &Path, data_dir: &Path) 
 }
 
 fn check_group_acl_permissions(paths: &[PathBuf], gname: &str) -> Result<()> {
-    use std::process::Command;
-    use std::collections::HashSet;
-    
-    let mut dirs_to_check = HashSet::new();
-    
-    for path in paths {
-        if path.is_dir() {
-            dirs_to_check.insert(path.clone());
-        }
-        
-        let mut current = path.clone();
-        while let Some(parent) = current.parent() {
-            if parent == Path::new("/") {
-                break;
-            }
-            dirs_to_check.insert(parent.to_path_buf());
-            current = parent.to_path_buf();
-        }
-    }
-    
-    for dir in dirs_to_check {
+    for dir in collect_dirs_and_ancestors(paths) {
         let output = Command::new("getfacl")
             .arg("--no-effective")
             .arg("--absolute-names")
             .arg(&dir)
             .output()
             .with_context(|| format!("Failed to get ACL for {}", dir.display()))?;
-        
+
         if !output.status.success() {
             bail!("getfacl failed for {}", dir.display());
         }
-        
+
         let acl_output = String::from_utf8_lossy(&output.stdout);
         let expected_entry = format!("group:{}:r-x", gname);
-        
+
         if !acl_output.lines().any(|line| line.trim() == expected_entry) {
             bail!("Missing ACL entry '{}' for {}", expected_entry, dir.display());
         }
     }
-    
+
     Ok(())
 }
 
 fn set_group_acl_permissions(paths: &[PathBuf], gname: &str) -> Result<()> {
-    use std::process::Command;
-    use std::collections::HashSet;
-    
-    let mut dirs_to_process = HashSet::new();
-    
-    for path in paths {
-        if path.is_dir() {
-            dirs_to_process.insert(path.clone());
-        }
-        
-        let mut current = path.clone();
-        while let Some(parent) = current.parent() {
-            if parent == Path::new("/") {
-                break;
-            }
-            dirs_to_process.insert(parent.to_path_buf());
-            current = parent.to_path_buf();
-        }
-    }
-    
-    for dir in dirs_to_process {
+    for dir in collect_dirs_and_ancestors(paths) {
         let status = Command::new("setfacl")
             .arg("-m")
             .arg(format!("g:{}:rx", gname))
             .arg(&dir)
             .status()
             .with_context(|| format!("Failed to set ACL on {}", dir.display()))?;
-        
+
         if !status.success() {
             eprintln!("warning: setfacl failed for {}", dir.display());
         }
     }
-    
+
     Ok(())
 }
