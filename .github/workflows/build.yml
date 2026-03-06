@@ -19,7 +19,7 @@ jobs:
     outputs:
       tag: ${{ steps.get.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Extract version
         id: get
         run: |
