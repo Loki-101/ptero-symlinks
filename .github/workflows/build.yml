@@ -19,7 +19,7 @@ jobs:
     outputs:
       tag: ${{ steps.get.outputs.tag }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Extract version
         id: get
         run: |
@@ -61,4 +61,5 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload "${{ needs.version.outputs.tag }}" dist/symlinks-${{ matrix.target }} --clobber
+
 
