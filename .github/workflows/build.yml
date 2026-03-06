@@ -45,10 +45,29 @@ jobs:
           command: build
           args: --locked --release
           use-rust-cache: true
-      - name: Prepare artifact
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: symlinks-${{ matrix.target }}
+          path: target/${{ matrix.target }}/release/symlinks
+
+  release:
+    name: Publish release
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Download all artifacts
+        uses: actions/download-artifact@v8
+        with:
+          path: dist
+      - name: Prepare binaries
         run: |
-          mkdir -p dist
-          cp target/${{ matrix.target }}/release/symlinks dist/symlinks-${{ matrix.target }}
+          for dir in dist/symlinks-*; do
+            target="${dir#dist/symlinks-}"
+            mv "$dir/symlinks" "dist/symlinks-${target}"
+            rmdir "$dir"
+          done
       - name: Ensure release exists
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -57,9 +76,10 @@ jobs:
           if ! gh release view "$TAG" >/dev/null 2>&1; then
             gh release create "$TAG" -t "$TAG" -n "Automated musl builds — $TAG"
           fi
-      - name: Publish to release
+      - name: Upload binaries to release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: gh release upload "${{ needs.version.outputs.tag }}" dist/symlinks-${{ matrix.target }} --clobber
-
-
+        run: |
+          for bin in dist/symlinks-*; do
+            gh release upload "${{ needs.version.outputs.tag }}" "$bin" --clobber
+          done
