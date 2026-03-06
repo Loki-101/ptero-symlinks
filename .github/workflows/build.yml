@@ -63,11 +63,13 @@ jobs:
           path: dist
       - name: Prepare binaries
         run: |
+          mkdir staging
           for dir in dist/symlinks-*; do
             target="${dir#dist/symlinks-}"
-            mv "$dir/symlinks" "dist/symlinks-${target}"
-            rmdir "$dir"
+            mv "$dir/symlinks" "staging/symlinks-${target}"
           done
+          rm -rf dist
+          mv staging dist
       - name: Ensure release exists
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -83,3 +85,4 @@ jobs:
           for bin in dist/symlinks-*; do
             gh release upload "${{ needs.version.outputs.tag }}" "$bin" --clobber
           done
+
