@@ -36,11 +36,11 @@ jobs:
           - x86_64-unknown-linux-musl
           - aarch64-unknown-linux-musl
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
       - name: Cross-compile (release)
         uses: houseabsolute/actions-rust-cross@v1
         with:
-          toolchain: 1.89.0
+          toolchain: 1.94.0
           target: ${{ matrix.target }}
           command: build
           args: --locked --release
@@ -61,3 +61,4 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: gh release upload "${{ needs.version.outputs.tag }}" dist/symlinks-${{ matrix.target }} --clobber
+
