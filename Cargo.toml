@@ -1,6 +1,6 @@
 [package]
 name = "ptero_symlinks"
-version = "0.2.1"
+version = "2.0.1"
 edition = "2024"
 rust-version = "1.89"
 authors = ["loki@crazycoder.dev"]
