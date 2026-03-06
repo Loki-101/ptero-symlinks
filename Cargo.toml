@@ -2,7 +2,7 @@
 name = "ptero_symlinks"
 version = "2.0.1"
 edition = "2024"
-rust-version = "1.89"
+rust-version = "1.94"
 authors = ["loki@crazycoder.dev"]
 license = "MIT"
 
