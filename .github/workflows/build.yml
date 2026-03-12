@@ -46,7 +46,7 @@ jobs:
           args: --locked --release
           use-rust-cache: true
       - name: Upload artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: symlinks-${{ matrix.target }}
           path: target/${{ matrix.target }}/release/symlinks
@@ -85,4 +85,5 @@ jobs:
           for bin in dist/symlinks-*; do
             gh release upload "${{ needs.version.outputs.tag }}" "$bin" --clobber
           done
+
 
