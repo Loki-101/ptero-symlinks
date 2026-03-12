@@ -1,11 +1,11 @@
 // ── Imports ─────────────────────────────────────────────────────────────────
 
-use anyhow::{anyhow, bail, Context, Result};
 use serde::Deserialize;
 use serde_json::Value as Json;
 use std::collections::HashSet;
 use std::env;
 use std::ffi::OsString;
+use std::fmt;
 use std::fs;
 use std::io::{self, Read, Write};
 use std::os::unix::fs as unix_fs;
@@ -32,14 +32,69 @@ struct SystemUser { gid: Option<u32> }
 #[derive(Clone, Debug)]
 struct Server { uuid: String, name: String }
 
-// ── Macros ──────────────────────────────────────────────────────────────────
+// ── Errors ──────────────────────────────────────────────────────────────────
 
-/// Unwraps an Option, or bails with the given message.
-macro_rules! unwrap_or_bail {
-    ($opt:expr, $($msg:tt)*) => {
-        $opt.ok_or_else(|| anyhow!($($msg)*))?
-    };
+#[derive(Debug)]
+enum Error {
+    NotRoot,
+    NoUser,
+    NoHome(String),
+    NeedAcl,
+    AclDisabled,
+    AclVerify(io::Error),
+    NoApiKey,
+    NoPanel,
+    BadPanel,
+    BadConfig(&'static str),
+    NodeNotFound,
+    Io(io::Error),
+    Yaml(serde_yaml_ng::Error),
+    Http(Box<ureq::Error>),
+    Symlink { link: PathBuf, target: PathBuf, source: io::Error },
+    SetAcl { dir: PathBuf, source: io::Error },
 }
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::NotRoot          => write!(f, "must run as root/sudo"),
+            Self::NoUser           => write!(f, "cannot resolve real user"),
+            Self::NoHome(u)        => write!(f, "home dir not found for {u}"),
+            Self::NeedAcl          => write!(f, "ACL tools (setfacl/getfacl) not found. Please install acl package."),
+            Self::AclDisabled      => write!(f, "ACL is not enabled on the filesystem. Please mount with 'acl' option."),
+            Self::AclVerify(e)     => write!(f, "Failed to verify ACL support: {e}"),
+            Self::NoApiKey         => write!(f, "API key missing"),
+            Self::NoPanel          => write!(f, "panel URL missing"),
+            Self::BadPanel         => write!(f, "panel must start with http:// or https://"),
+            Self::BadConfig(msg)   => write!(f, "{msg}"),
+            Self::NodeNotFound     => write!(f, "node not found"),
+            Self::Io(e)            => write!(f, "{e}"),
+            Self::Yaml(e)          => write!(f, "{e}"),
+            Self::Http(e)          => write!(f, "{e}"),
+            Self::Symlink { link, target, source } => write!(f, "symlink {} -> {}: {}", link.display(), target.display(), source),
+            Self::SetAcl { dir, source } => write!(f, "Failed to set ACL on {}: {source}", dir.display()),
+        }
+    }
+}
+
+impl From<io::Error> for Error { fn from(e: io::Error) -> Self { Self::Io(e) } }
+impl From<serde_yaml_ng::Error> for Error { fn from(e: serde_yaml_ng::Error) -> Self { Self::Yaml(e) } }
+impl From<ureq::Error> for Error { fn from(e: ureq::Error) -> Self { Self::Http(Box::new(e)) } }
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Io(e)                  => Some(e),
+            Self::Yaml(e)                => Some(e),
+            Self::Http(e)                => Some(e.as_ref()),
+            Self::AclVerify(e)           => Some(e),
+            Self::SetAcl { source, .. }  => Some(source),
+            Self::Symlink { source, .. } => Some(source),
+            _                            => None,
+        }
+    }
+}
+
+type Result<T> = std::result::Result<T, Error>;
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -67,7 +122,18 @@ fn collect_dirs_and_ancestors(paths: &[PathBuf]) -> HashSet<PathBuf> {
 
 // ── Entry Point ─────────────────────────────────────────────────────────────
 
-fn main() { if let Err(e) = run() { eprintln!("{e:#}"); std::process::exit(1); } }
+fn main() {
+    if let Err(e) = run() {
+        eprint!("{e}");
+        let mut src = std::error::Error::source(&e);
+        while let Some(cause) = src {
+            eprint!(": {cause}");
+            src = cause.source();
+        }
+        eprintln!();
+        std::process::exit(1);
+    }
+}
 
 // ── Core Logic ──────────────────────────────────────────────────────────────
 
@@ -90,7 +156,7 @@ fn run() -> Result<()> {
         let name = format!("{}-{}", safe(&s.name), &s.uuid[..8]);
         let link = link_dir.join(name);
         if link.exists() { continue; }
-        unix_fs::symlink(&target, &link).with_context(|| format!("symlink {} -> {}", link.display(), target.display()))?;
+        unix_fs::symlink(&target, &link).map_err(|e| Error::Symlink { link: link.clone(), target: target.clone(), source: e })?;
         made += 1;
     }
 
@@ -103,22 +169,18 @@ fn run() -> Result<()> {
 }
 
 fn env_cfg() -> Result<(String, String, PathBuf, String)> {
-    if get_current_uid() != 0 { bail!("must run as root/sudo"); }
+    if get_current_uid() != 0 { return Err(Error::NotRoot); }
 
-    let real_user = unwrap_or_bail!(
-        env::var("SUDO_USER").ok().filter(|s| !s.is_empty())
+    let real_user = env::var("SUDO_USER").ok().filter(|s| !s.is_empty())
             .or_else(|| get_user_by_uid(get_current_uid())
-                .map(|u| u.name().to_string_lossy().into_owned())),
-        "cannot resolve real user"
-    );
+                .map(|u| u.name().to_string_lossy().into_owned()))
+        .ok_or(Error::NoUser)?;
 
-    let home = unwrap_or_bail!(
-        get_user_by_name(&real_user).map(|u| u.home_dir().to_path_buf()),
-        "home dir not found for {real_user}"
-    );
+    let home = get_user_by_name(&real_user).map(|u| u.home_dir().to_path_buf())
+        .ok_or(Error::NoHome(real_user.clone()))?;
 
     if !has_command("setfacl") || !has_command("getfacl") {
-        bail!("ACL tools (setfacl/getfacl) not found. Please install acl package.");
+        return Err(Error::NeedAcl);
     }
 
     let acl_test = Command::new("getfacl")
@@ -133,18 +195,16 @@ fn env_cfg() -> Result<(String, String, PathBuf, String)> {
         Ok(output) if !output.status.success() => {
             let stderr = String::from_utf8_lossy(&output.stderr);
             if stderr.contains("Operation not supported") || stderr.contains("not supported") {
-                bail!("ACL is not enabled on the filesystem. Please mount with 'acl' option.");
+                return Err(Error::AclDisabled);
             }
         }
-        Err(e) => {
-            bail!("Failed to verify ACL support: {}", e);
-        }
+        Err(e) => { return Err(Error::AclVerify(e)); }
         _ => {}
     }
 
-    let api_key = env::var("API_KEY").or_else(|_| env::var("PTERO_API_KEY")).context("API key missing")?;
-    let mut panel = env::var("PANEL_FQDN").or_else(|_| env::var("PTERO_PANEL")).context("panel URL missing")?;
-    if !(panel.starts_with("http://") || panel.starts_with("https://")) { bail!("panel must start with http:// or https://"); }
+    let api_key = env::var("API_KEY").or_else(|_| env::var("PTERO_API_KEY")).map_err(|_| Error::NoApiKey)?;
+    let mut panel = env::var("PANEL_FQDN").or_else(|_| env::var("PTERO_PANEL")).map_err(|_| Error::NoPanel)?;
+    if !(panel.starts_with("http://") || panel.starts_with("https://")) { return Err(Error::BadPanel); }
     while panel.ends_with('/') { panel.pop(); }
 
     Ok((api_key, panel, home, real_user))
@@ -156,8 +216,8 @@ fn read_wings_config(p: impl AsRef<Path>) -> Result<WingsConfig> {
     let mut s = String::new();
     fs::File::open(p.as_ref())?.read_to_string(&mut s)?;
     let cfg: WingsConfig = serde_yaml_ng::from_str(&s)?;
-    if cfg.uuid.len() < 8 { bail!("bad node uuid in config.yml"); }
-    if cfg.system.data.trim().is_empty() { bail!("missing system.data in config.yml"); }
+    if cfg.uuid.len() < 8 { return Err(Error::BadConfig("bad node uuid in config.yml")); }
+    if cfg.system.data.trim().is_empty() { return Err(Error::BadConfig("missing system.data in config.yml")); }
     Ok(cfg)
 }
 
@@ -172,7 +232,7 @@ fn fetch_node_id(panel: &str, key: &str, uuid: &str) -> Result<u64> {
         .query("per_page", "1")
         .call()?;
     let js: Json = response.body_mut().read_json()?;
-    js["data"][0]["attributes"]["id"].as_u64().ok_or_else(|| anyhow!("node not found"))
+    js["data"][0]["attributes"]["id"].as_u64().ok_or(Error::NodeNotFound)
 }
 
 fn fetch_servers_on_node(panel: &str, key: &str, node_id: u64) -> Result<Vec<Server>> {
@@ -234,7 +294,7 @@ fn group_management(gid: u32, username: &str, link_dir: &Path, data_dir: &Path) 
         }
 
         let paths = vec![link_dir.to_path_buf(), data_dir.to_path_buf()];
-        if let Err(_) = check_group_acl_permissions(&paths, &gname) {
+        if !check_group_acl_permissions(&paths, &gname) {
             needs_acl_fix = true;
         }
 
@@ -297,28 +357,35 @@ fn group_management(gid: u32, username: &str, link_dir: &Path, data_dir: &Path) 
     }
 }
 
-fn check_group_acl_permissions(paths: &[PathBuf], gname: &str) -> Result<()> {
+fn check_group_acl_permissions(paths: &[PathBuf], gname: &str) -> bool {
     for dir in collect_dirs_and_ancestors(paths) {
-        let output = Command::new("getfacl")
+        let output = match Command::new("getfacl")
             .arg("--no-effective")
             .arg("--absolute-names")
             .arg(&dir)
             .output()
-            .with_context(|| format!("Failed to get ACL for {}", dir.display()))?;
-
-        if !output.status.success() {
-            bail!("getfacl failed for {}", dir.display());
-        }
+        {
+            Ok(o) if o.status.success() => o,
+            Ok(_) => {
+                eprintln!("warning: getfacl failed for {}", dir.display());
+                return false;
+            }
+            Err(e) => {
+                eprintln!("warning: failed to get ACL for {}: {e}", dir.display());
+                return false;
+            }
+        };
 
         let acl_output = String::from_utf8_lossy(&output.stdout);
         let expected_entry = format!("group:{}:r-x", gname);
 
         if !acl_output.lines().any(|line| line.trim() == expected_entry) {
-            bail!("Missing ACL entry '{}' for {}", expected_entry, dir.display());
+            eprintln!("warning: missing ACL entry '{}' on {}", expected_entry, dir.display());
+            return false;
         }
     }
 
-    Ok(())
+    true
 }
 
 fn set_group_acl_permissions(paths: &[PathBuf], gname: &str) -> Result<()> {
@@ -328,7 +395,7 @@ fn set_group_acl_permissions(paths: &[PathBuf], gname: &str) -> Result<()> {
             .arg(format!("g:{}:rx", gname))
             .arg(&dir)
             .status()
-            .with_context(|| format!("Failed to set ACL on {}", dir.display()))?;
+            .map_err(|e| Error::SetAcl { dir: dir.clone(), source: e })?;
 
         if !status.success() {
             eprintln!("warning: setfacl failed for {}", dir.display());

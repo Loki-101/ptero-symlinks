@@ -1,6 +1,6 @@
 [package]
 name = "ptero_symlinks"
-version = "2.0.1"
+version = "2.0.2"
 edition = "2024"
 rust-version = "1.94"
 authors = ["loki@crazycoder.dev"]
@@ -11,12 +11,11 @@ name = "symlinks"
 path = "src/main.rs"
 
 [dependencies]
-anyhow = "1.0.102"
-ureq = { version = "3.2.0", features = ["json"] }
-serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.149"
-serde_yaml_ng = "0.10.0"
-uzers = "0.12.2"
+ureq = { version = "3.2", features = ["json"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+serde_yaml_ng = "0.10"
+uzers = "0.12"
 
 [profile.dev]
 opt-level = 1
