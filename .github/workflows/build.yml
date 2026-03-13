@@ -38,7 +38,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@1.94.0
+        uses: dtolnay/rust-toolchain@stable
         with:
           targets: ${{ matrix.target }}
       - name: Install cargo-zigbuild
@@ -85,6 +85,7 @@ jobs:
           for bin in dist/symlinks-*; do
             gh release upload "${{ needs.version.outputs.tag }}" "$bin" --clobber
           done
+
 
 
 
