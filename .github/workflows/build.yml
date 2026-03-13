@@ -37,14 +37,14 @@ jobs:
           - aarch64-unknown-linux-musl
     steps:
       - uses: actions/checkout@v6
-      - name: Cross-compile (release)
-        uses: houseabsolute/actions-rust-cross@v1
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@1.94.0
         with:
-          toolchain: 1.94.0
-          target: ${{ matrix.target }}
-          command: build
-          args: --locked --release
-          use-rust-cache: true
+          targets: ${{ matrix.target }}
+      - name: Install cargo-zigbuild
+        run: pip install cargo-zigbuild --break-system-packages
+      - name: Build (release)
+        run: cargo zigbuild --locked --release --target ${{ matrix.target }}
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
@@ -85,6 +85,7 @@ jobs:
           for bin in dist/symlinks-*; do
             gh release upload "${{ needs.version.outputs.tag }}" "$bin" --clobber
           done
+
 
 
 
