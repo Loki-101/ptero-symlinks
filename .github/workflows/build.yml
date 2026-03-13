@@ -50,6 +50,7 @@ jobs:
         with:
           name: symlinks-${{ matrix.target }}
           path: target/${{ matrix.target }}/release/symlinks
+          archive: false
 
   release:
     name: Publish release
@@ -85,5 +86,6 @@ jobs:
           for bin in dist/symlinks-*; do
             gh release upload "${{ needs.version.outputs.tag }}" "$bin" --clobber
           done
+
 
 
