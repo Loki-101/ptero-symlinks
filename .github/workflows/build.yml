@@ -50,8 +50,6 @@ jobs:
         with:
           name: symlinks-${{ matrix.target }}
           path: target/${{ matrix.target }}/release/symlinks
-          overwrite: true
-          archive: false
 
   release:
     name: Publish release
