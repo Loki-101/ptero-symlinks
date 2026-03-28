@@ -76,7 +76,7 @@ jobs:
         run: |
           TAG="${{ needs.version.outputs.tag }}"
           if ! gh release view "$TAG" >/dev/null 2>&1; then
-            gh release create "$TAG" -t "$TAG" -n "Automated musl builds — $TAG"
+            gh release create "$TAG" -t "$TAG" -n "$TAG"
           fi
       - name: Upload binaries to release
         env:
