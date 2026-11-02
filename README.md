@@ -1,3 +1,17 @@
+<table>
+<tr>
+<td><img src="https://www.pngall.com/wp-content/uploads/8/Red-Warning-PNG-Free-Download.png" width="100"></td>
+<td align="center" bgcolor="#FFFF00">
+
+# WARNING
+
+**This software was build for Pterodactyl Panel V1. It may not work on V2, and support is not planned for V2.**
+
+</td>
+<td><img src="https://www.pngall.com/wp-content/uploads/8/Red-Warning-PNG-Free-Download.png" width="100"></td>
+</tr>
+</table>
+
 # symlinks
 ## Requirements
 - Either Amd64 or Aarch64 architecture
